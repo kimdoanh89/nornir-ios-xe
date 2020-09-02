@@ -1,0 +1,69 @@
+version: "3"
+services:
+  influxdb:
+    image: influxdb
+    container_name: influxdb
+    restart: always
+    user: "${CURRENT_UID}:${CURRENT_GID}"
+    ports:
+      - 8086:8086
+    networks:
+      - telemetry
+    volumes:
+      - ${INFLUX_CONFIG}:/etc/influxdb
+      - ${INFLUX_DATA}:/var/lib/influxdb
+      - ${INFLUX_CONFIG}/scripts:/docker-entrypoint-initdb.d
+    environment:
+      - INFLUXDB_ADMIN_ENABLED=true
+      - INFLUXDB_ADMIN_USER=influxdb
+      - INFLUXDB_ADMIN_PASSWORD=influxdb
+
+  telegraf:
+    image: telegraf
+    container_name: telegraf
+    restart: always
+    user: "${CURRENT_UID}:${CURRENT_GID}"
+    ports:
+      - 57000:57000
+    networks:
+      - telemetry
+    volumes:
+      - ${TELEGRAF_CONFIG}:/etc/telegraf:ro
+    entrypoint: /entrypoint.sh -config /etc/telegraf/telegraf.conf -config-directory /etc/telegraf/telegraf.d
+
+  telegraf2:
+    # second telegraf instance with gnmi on_change subscription config only
+    # refer to README.md for detail
+    image: telegraf
+    container_name: telegraf2
+    restart: always
+    user: "${CURRENT_UID}:${CURRENT_GID}"
+    networks:
+      - telemetry
+    volumes:
+      - ${TELEGRAF_CONFIG}:/etc/telegraf:ro
+    entrypoint: /entrypoint.sh -config /etc/telegraf/gnmi_on_change.conf
+
+  chronograf:
+    image: chronograf
+    container_name: chronograf
+    restart: always
+    ports:
+      - 8888:8888
+    networks:
+      - telemetry
+    volumes:
+      - chronograf-volume:/var/lib/chronograf # persistent volume
+networks:
+  telemetry:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.238.0/24
+volumes:
+  #grafana-volume:
+    #external:
+      #name: "${GRAFANA_VOLUME}"
+  chronograf-volume:
+    external:
+      name: "${CHRONOGRAF_VOLUME}"
